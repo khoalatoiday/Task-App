@@ -12,6 +12,7 @@ const taskSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  // tạo owner để biết được user nào tạo task 
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,

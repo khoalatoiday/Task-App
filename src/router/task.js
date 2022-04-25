@@ -38,15 +38,17 @@ router.get("/tasks", auth, async (req, res) => {
     sort[parts[0]] = sort[parts[1]] === 'desc'? -1:1 // [dynamicValue~variable] còn .[staticValue~constant]
     // sắp xếp theo field (parts[0]) tăng hoặc giảm dần(parts[1])
   }
-
+  
   console.log(sort)
 
 
   try {
     //const tasks = await Task.find({owner: req.user._id});
+
+    // lấy toàn bộ tasks được tạo bởi user này và lưu vào trong vitual field là "mytasks"
     await req.user
       .populate({
-        path: "mytasks", // field = 'mytasks'
+        path: "mytasks", // field = 'mytasks', vituralField được tạo bởi User Schema
         match, // thêm option thông tin muốn lọc cho document, option cá nhân 
         options:{ // option được cung cấp sẵn
           limit: parseInt(req.query.limit), // thêm option limit
@@ -88,8 +90,8 @@ router.patch("/task/:id", auth, async (req, res) => {
 
   try {
     // const task = await Task.findByIdAndUpdate(req.params.id, req.body, {
-    //   new: true,
-    //   runValidators: true,
+    //   new: true, // tạo một task mới
+    //   runValidators: true, // run validator cho task
     // });
 
     const task = await Task.findOne({

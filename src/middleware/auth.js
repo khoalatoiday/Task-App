@@ -5,9 +5,13 @@ const User = require ('../model/user')
 
 const auth = async (req,res,next) =>{
     try {
+        // Authorization là một key của header
         const token = req.header('Authorization').replace('Bearer ','')
-        const decode = jwt.verify(token,process.env.JWT_SECRET) // return token
-        const user = await User.findOne({_id: decode._id,'tokens.token': token})
+        //console.log(token)
+        const decode = jwt.verify(token,process.env.JWT_SECRET) // return {_id: user._id.toString()} ~ Object tạo ra token ở generateAuthToken() 
+
+        // tìm user
+        const user = await User.findOne({_id: decode._id,'tokens.token': token}) //  kiểm tra token từ request có trong dãy tokens trong mongoDB không?
 
         if(!user){
             throw new Error() // chạy catch()

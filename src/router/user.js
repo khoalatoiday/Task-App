@@ -7,22 +7,23 @@ const User = require("../model/user");
 const auth = require("../middleware/auth");
 
 // thư viện dùng để định dạng và cắt, chỉnh sửa size ảnh
-const sharp = require("sharp")
+const sharp = require("sharp");
 
 const multer = require("multer");
 const upload = multer({
   // dest: "avatars", // không có dest -> thì file sẽ được upload vào request.file
   limits: 1000000,
-  fileFilter(req,file,cb){
-    if(!file.originalname.match(/\.(jpg||jpeg||png)$/)){
-      return cb(new Error("Please upload one of these file: jpg,jpeg,png"))
+  fileFilter(req, file, cb) {
+    if (!file.originalname.match(/\.(jpg||jpeg||png)$/)) {
+      return cb(new Error("Please upload one of these file: jpg,jpeg,png"));
     }
-    cb(undefined,true) // accept file
-  }
-})
+    cb(undefined, true); // accept file
+  },
+});
 
-const {sendWelcomeEmail,sendCancelEmail} = require("../email/account")
+const { sendWelcomeEmail, sendCancelEmail } = require("../email/account");
 
+// set up router
 const router = new express.Router();
 
 // REST API for creating User, post HTTP method được thiết kế cho tạo mới resources
@@ -34,30 +35,27 @@ router.post("/users", async (req, res) => {
   const user = new User(req.body);
   // sử dụng try_catch để bắt lỗi reject của await promise
   try {
-
-    sendWelcomeEmail(user.email,user.name)
-    await user.save();
+    sendWelcomeEmail(user.email, user.name);
+    
     const token = await user.generateAuthToken();
-
+    await user.save();
     res.status(201).send({ user, token });
   } catch (e) {
-    console.log(e)
+    console.log(e);
     res.status(400).send(e);
   }
 });
 
 //REST API Reading User, get HTTP method được thiết cho đọc dữ liệu resources
 router.get("/users/me", auth, async (req, res) => {
-  res.send({profile: req.user.getPublicObject()});
+  res.send({ profile: req.user.getPublicObject() });
 });
-
 
 // REST API for deleting user, delete HTTP method được thiết kế cho deleting
 router.delete("/users/me", auth, async (req, res) => {
   try {
-
     await req.user.remove();
-    sendCancelEmail(req.user.email,req.user.name)
+    sendCancelEmail(req.user.email, req.user.name);
     res.send(req.user);
   } catch (error) {
     res.send(500).send();
@@ -65,11 +63,14 @@ router.delete("/users/me", auth, async (req, res) => {
 });
 
 // REST API for updating user, patch HTTP method được thiết kế để update resources có sẵn
+// thực tế nếu ta update field mà không có trong collection thì mongoose sẽ lờ đi
 router.patch("/users/me", auth, async (req, res) => {
   const allowUpdateKeys = ["name", "age", "email", "password"];
   const updateKeys = Object.keys(req.body); // lấy các key của Object req.body và lưu vào mảng
-  const isValidateKey = updateKeys.every((updateKey) =>
-    allowUpdateKeys.includes(updateKey)
+  const isValidateKey = updateKeys.every(
+    (
+      updateKey //every khiến tất cả element đều gọi callback để test và trả về boolean -> để trả về true thì tất cả phải true, chỉ cần 1 false thì sẽ về false
+    ) => allowUpdateKeys.includes(updateKey)
   );
 
   if (!isValidateKey) {
@@ -128,51 +129,57 @@ router.post("/users/logoutAll", auth, async (req, res) => {
   }
 });
 
-
 // thêm athorization để user tự upload ảnh, dữ liệu ảnh sẽ được lưu vào database dưới dạng binary(buffer)
-router.post("/users/me/avatar",auth,upload.single("avatar"),async (req,res)=>{
-  // req.user.avatar = req.file.buffer // dữ liệu buffer được lưu trong req.file(nếu có file được upload)
-  // sử dụng sharp để chỉnh sửa ảnh, vẫn ở lưu ở dạng buffter(binary)
-  const imageSharp =  await sharp(req.file.buffer).resize({width:250,height:250}).png().toBuffer()
-  req.user.avatar = imageSharp
-  await req.user.save()
-  res.send()
-},(error,req,res,next)=>{
-  res.status(400).send({error: error.message})
-})
+router.post(
+  "/users/me/avatar",
+  auth,
+  upload.single("avatar"),
+  async (req, res) => {
+    // req.user.avatar = req.file.buffer // dữ liệu buffer được lưu trong req.file(nếu có file được upload)
+    // sử dụng sharp để chỉnh sửa ảnh, vẫn ở lưu ở dạng buffter(binary)
+    const imageSharp = await sharp(req.file.buffer)
+      .resize({ width: 250, height: 250 })
+      .png()
+      .toBuffer();
+    req.user.avatar = imageSharp;
+    await req.user.save();
+    res.send();
+  },
+  (error, req, res, next) => {
+    res.status(400).send({ error: error.message });
+  }
+);
 
-router.delete("/users/me/avatar",auth, async (req,res)=>{
-  req.user.avatar = undefined
-  await req.user.save()
-  res.send()
-})
+router.delete("/users/me/avatar", auth, async (req, res) => {
+  req.user.avatar = undefined;
+  await req.user.save();
+  res.send();
+});
 
 //serve up file
-router.get("/users/:id/avatar", async(req,res)=>{
+router.get("/users/:id/avatar", async (req, res) => {
   try {
-    const user = await User.findById(req.params.id)
-    if(!user || !user.avatar){
-      throw new Error("Error! Not found User or Avatar of User")
+    const user = await User.findById(req.params.id);
+    if (!user || !user.avatar) {
+      throw new Error("Error! Not found User or Avatar of User");
     }
     //set header properties
-    res.set("Content-type", "image/png") // key - value 
-    res.send(user.avatar)
+    res.set("Content-type", "image/png"); // key - value
+    res.send(user.avatar);
   } catch (error) {
-    res.status(400).send({error: error.message})
+    res.status(400).send({ error: error.message });
   }
-})
+});
 
 module.exports = router;
 
 // Thực tế không nên cung cấp id cho người dùng khi thực hiện chức năng-> người dùng
 // chỉ có thể tự xóa hoặc update user của chính mình
 
-
-//với :id(route parameter ~ với id là tên tự đặt) là dynamic value được cung cấp bởi moogoose
+//với :id(route parameter ~ với id là tên tự đặt) được cung cấp vởi Express
 // và được lưu vào req.params(lưu các route paramater), truy cập vào route parameter bất kì: req.params.nameOfRouteParameter
 // router.get("/users/:id", async (req, res) => {
 //   const _id = req.params.id;
-
 //   try {
 //     const user = await User.findById(_id);
 //     if (!user) {
@@ -197,42 +204,6 @@ module.exports = router;
 //   }
 // });
 
-// router.patch("/user/:id", async (req, res) => {
-//   const allowUpdateKeys = ["name", "age", "email", "password"];
-//   const updateKeys = Object.keys(req.body); // lấy các key của Object req.body và lưu vào mảng
-//   const isValidateKey = updateKeys.every((updateKey) =>
-//     allowUpdateKeys.includes(updateKey)
-//   );
-
-//   if (!isValidateKey) {
-//     return res.status(400).send({ error: "Invalid Update" });
-//   }
-
-//   try {
-// req.body chứa thông tin muốn update
-// new: true: trả và ghi đè một document mới sau khi update
-// runValidators: true bật validator để kiểm tra thông tin khi update
-// const user = await User.findByIdAndUpdate(req.params.id, req.body, {
-//   new: true,
-//   runValidators: true,
-// });
-
-//     const user = await User.findById(req.params.id);
-
-//     updateKeys.forEach((updateKey) => (user[updateKey] = req.body[updateKey])); // [dynamicValue]
-
-//     await user.save();
-
-//     if (!user) {
-//       return res.status(404).send({ error: "Not Fount Id" });
-//     }
-
-//     res.status(200).send(user);
-//   } catch (error) {
-//     console.log(error);
-//     res.status(500).send(error);
-//   }
-// });
 
 // router.get("/users",async (req,res)=>{
 //   try {
