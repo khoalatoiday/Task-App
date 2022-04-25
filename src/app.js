@@ -1,4 +1,5 @@
 const express = require("express");
+require('dotenv').config()
 require("./db/mongoose"); // connect database
 const userRouter = require("./router/user");
 const taskRouter = require("./router/task");
